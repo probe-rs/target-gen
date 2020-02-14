@@ -16,7 +16,7 @@ use cmsis_pack::pdsc::Package;
 use cmsis_pack::pdsc::Processors;
 use cmsis_pack::utils::FromElem;
 use pretty_env_logger;
-use probe_rs::config::memory::{FlashRegion, MemoryRegion, RamRegion};
+use probe_rs::config::{FlashRegion, MemoryRegion, RamRegion};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
