@@ -1,7 +1,7 @@
 use crate::error::Error;
+use crate::flash_device::FlashDevice;
 use crate::raw_flash_algorithm::RawFlashAlgorithm;
 use probe_rs::config::{FlashProperties, SectorDescription};
-use crate::flash_device::FlashDevice;
 
 /// Extract a chunk of data from an ELF binary.
 ///
