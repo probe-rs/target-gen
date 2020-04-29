@@ -18,36 +18,101 @@ use probe_rs::config::{FlashRegion, MemoryRegion, RamRegion};
 use structopt::StructOpt;
 
 use fs::create_dir;
+use parser::extract_flash_algo;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 #[derive(StructOpt)]
-struct Options {
-    #[structopt(
-        name = "INPUT",
-        parse(from_os_str),
-        help = "A Pack file or the unziped Pack directory."
-    )]
-    input: PathBuf,
-    #[structopt(
-        name = "OUTPUT",
-        parse(from_os_str),
-        help = "An output directory where all the generated .yaml files are put in."
-    )]
-    output_dir: PathBuf,
+enum TargetGen {
+    /// Generate target description from ARM CMSIS-Packs
+    Pack {
+        #[structopt(
+            name = "INPUT",
+            parse(from_os_str),
+            help = "A Pack file or the unziped Pack directory."
+        )]
+        input: PathBuf,
+        #[structopt(
+            name = "OUTPUT",
+            parse(from_os_str),
+            help = "An output directory where all the generated .yaml files are put in."
+        )]
+        output_dir: PathBuf,
+    },
+    /// Extract a flash algorithm from an ELF file
+    Extract {
+        /// ELF file containing a flash algorithm
+        #[structopt(parse(from_os_str))]
+        elf: PathBuf,
+        /// Output file, if provided, the generated target description will be written to this file.
+        #[structopt(parse(from_os_str))]
+        output: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
     pretty_env_logger::init();
 
-    let options = Options::from_args();
+    let options = TargetGen::from_args();
 
-    // The directory in which to look for the .pdsc file.
-    let input = options.input;
-    let out_dir = options.output_dir;
+    match options {
+        TargetGen::Pack { input, output_dir } => cmd_pack(&input, &output_dir)?,
+        TargetGen::Extract { elf, output } => cmd_extract(elf, output)?,
+    }
 
+    Ok(())
+}
+
+/// Prepare a target config based on an ELF file containing a flash algorithm.
+fn cmd_extract(file: PathBuf, output: Option<PathBuf>) -> Result<()> {
+    let elf_file = File::open(&file)?;
+
+    let algorithm = extract_flash_algo(elf_file, &file, true)?;
+
+    let algorithm_name = algorithm.name.clone();
+
+    let mut flash_algorithms = HashMap::new();
+
+    flash_algorithms.insert(algorithm.name.clone(), algorithm);
+
+    let chip_family = ChipFamily {
+        name: "<family name>".to_owned(),
+        core: "<mcu core>".to_owned(),
+        variants: vec![Chip {
+            name: "<chip name>".to_owned(),
+            memory_map: vec![
+                MemoryRegion::Flash(FlashRegion {
+                    is_boot_memory: false,
+                    range: 0..0x2000,
+                }),
+                MemoryRegion::Ram(RamRegion {
+                    is_boot_memory: true,
+                    range: 0x1_0000..0x2_0000,
+                }),
+            ],
+            flash_algorithms: vec![algorithm_name],
+        }],
+        flash_algorithms,
+    };
+
+    let serialized = serde_yaml::to_string(&chip_family)?;
+
+    match output {
+        Some(output) => {
+            std::fs::write(&output, serialized)?;
+        }
+        None => println!("{}", serialized),
+    }
+    Ok(())
+}
+
+/// Handle the pack subcommand. `input` is either the path
+/// to a CMSIS-Pack file, or a directory containing at least one .pdsc file.
+///
+/// Generated target description will be placed in `out_dir`.
+fn cmd_pack(input: &Path, out_dir: &Path) -> Result<()> {
     ensure!(
         input.exists(),
         "No such file or directory: {}",
