@@ -17,7 +17,7 @@ This wil generate YAML files containing the target descriptions, which can be us
 ## Usage with ELF files
 
 The target-gen tool can also be used to create a target description based on an ELF file. This
-requires that the ELF file confirms to the ARM CMSIS standard for flash algorithms, which
+requires that the ELF file adhers to the ARM CMSIS standard for flash algorithms, which
 can be found at: https://arm-software.github.io/CMSIS_5/Pack/html/algorithmFunc.html
 
 
