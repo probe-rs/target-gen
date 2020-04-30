@@ -1,6 +1,5 @@
 use crate::flash_device::FlashDevice;
-use crate::raw_flash_algorithm::RawFlashAlgorithm;
-use probe_rs::config::{FlashProperties, SectorDescription};
+use probe_rs::config::{FlashProperties, RawFlashAlgorithm, SectorDescription};
 
 use anyhow::{anyhow, Context, Result};
 
@@ -78,7 +77,7 @@ pub fn extract_flash_algo(
 
     // Extract binary blob.
     let algorithm_binary = crate::algorithm_binary::AlgorithmBinary::new(&elf, &buffer)?;
-    algo.instructions = base64::encode(&algorithm_binary.blob());
+    algo.instructions = Vec::from(base64::encode(&algorithm_binary.blob()).as_bytes()).into();
 
     let code_section_offset = algorithm_binary.code_section.start;
 
@@ -96,8 +95,14 @@ pub fn extract_flash_algo(
         }
     }
 
-    algo.description = flash_device.name;
-    algo.name = file_name.file_stem().unwrap().to_str().unwrap().to_owned();
+    algo.description = flash_device.name.into();
+    algo.name = file_name
+        .file_stem()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned()
+        .into();
     algo.default = default;
     algo.data_section_offset = algorithm_binary.data_section.start;
 
